@@ -1,0 +1,101 @@
+# green-api-mcp-gateway — example configuration
+# Copy to config.yaml and fill in your values.
+#
+# Two deployment modes:
+#   1. Local stdio (auth.mode: config) — credentials come from
+#      green_api.instances below or from env vars GREEN_API_INSTANCE_ID
+#      and GREEN_API_TOKEN (optional GREEN_API_URL).
+#   2. Networked HTTP transports (sse / http / hybrid) with
+#      auth.mode: proxy — credentials arrive per-request via HTTP
+#      headers (Authorization: Basic <base64(id:token)> or
+#      X-Instance-Id + X-Api-Token) or the built-in OAuth 2.0 flow.
+#      In proxy mode the green_api.instances block is unused.
+#
+# All settings can be overridden with environment variables:
+#   GREEN_API_TRANSPORT, GREEN_API_PORT, GREEN_API_BASE_URL
+#   GREEN_API_INSTANCE_ID, GREEN_API_TOKEN, GREEN_API_URL  (stdio shortcut)
+#   GREEN_API_AUTH_MODE, GREEN_API_AUTH_CACHE_TTL
+#   GREEN_API_WEBHOOK_MODE
+#   LOG_LEVEL, LOG_FORMAT
+
+# ─── MCP Server ─────────────────────────────────────────────────────────────
+server:
+  # Transport: stdio   (default, for Claude Desktop / OpenClaw),
+  #            sse     (legacy SSE: /sse + /message),
+  #            http    (Streamable HTTP: /mcp — MCP 2025-03-26, used by claude.ai),
+  #            hybrid  (both SSE and Streamable HTTP on the same port).
+  transport: stdio
+
+  # TCP port — used only for sse, http, and hybrid transports.
+  port: 8090
+
+  # TLS/HTTPS — enable for local HTTPS (self-signed cert) or production TLS.
+  # tls:
+  #   enabled: true
+  #   cert_file: config/localhost.crt
+  #   key_file: config/localhost.key
+
+# ─── Authentication ─────────────────────────────────────────────────────────
+auth:
+  # mode: config — use instances from green_api.instances config (default)
+  #       proxy  — extract credentials from HTTP headers (for public server)
+  mode: config
+  
+  # Cache TTL for validated proxy credentials (seconds, proxy mode only)
+  cache_ttl: 300  # 5 minutes
+
+# ─── Green API Instances ─────────────────────────────────────────────────────
+green_api:
+  instances:
+    # Primary instance — replace with your real values from console.green-api.com
+    # (Required for auth.mode: config, optional fallback for auth.mode: proxy)
+    - id: 9903959909
+      api_token: "YOUR_API_TOKEN_HERE"
+      api_url: "https://api.p03.green-api.com"
+
+    # Example second instance (multi-instance support, Phase 2):
+    # - id: 1234567890
+    #   api_token: "ANOTHER_TOKEN"
+    #   api_url: "https://api.green-api.com"
+
+# ────────────────────────────────────────────────────────────────────────────
+# For auth.mode: proxy, credentials are passed via HTTP headers:
+#
+#   Option 1 (Basic Auth):
+#     Authorization: Basic <base64(instanceId:apiToken)>
+#     
+#   Option 2 (Custom Headers):
+#     X-Instance-Id: 1234567890
+#     X-Api-Token: your-api-token-here
+#     X-Api-Url: https://api.green-api.com  (optional, defaults to api.green-api.com)
+#
+# Credentials are validated via getStateInstance API call and cached for cache_ttl seconds.
+# Falls back to green_api.instances config if no headers provided (backward compatibility).
+# ────────────────────────────────────────────────────────────────────────────
+
+# ─── Webhook / Notifications ─────────────────────────────────────────────────
+webhook:
+  # mode: polling   — gateway long-polls receiveNotification (no extra infra needed)
+  #        receiver — gateway exposes an HTTP endpoint that your webhook producer POSTs notifications to
+  mode: polling
+
+  # Timeout in seconds for long-poll receiveNotification requests.
+  polling_timeout: 20
+
+  # HTTP port for webhook receiver mode (mode: receiver).
+  # You must also call whatsapp_set_settings to point webhookUrl here.
+  # receiver_port: 8091
+
+# ─── Logging ─────────────────────────────────────────────────────────────────
+logging:
+  # level: debug | info | warn | error
+  level: info
+
+  # format: text (human-readable) | json (structured, for log aggregators)
+  format: text
+
+# ─── Metrics (Prometheus) ────────────────────────────────────────────────────
+metrics:
+  enabled: false
+  port: 9090
+

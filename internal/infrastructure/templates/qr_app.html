@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GREEN-API QR</title>
+  <style>
+    :root {
+      --green:  #3b9802;
+      --green2: #2e7a01;
+      --bg:     #0c0c0c;
+      --card:   #131313;
+      --border: #1d1d1d;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    @keyframes spin    { to { transform: rotate(360deg); } }
+    @keyframes fadeUp  { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px 22px 18px;
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 60px rgba(59,152,2,.03), 0 4px 48px rgba(0,0,0,.7);
+      animation: fadeUp .3s ease;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .header-title { color: #e8e8e8; font-size: 14px; font-weight: 700; letter-spacing: .02em; line-height: 1; }
+    .header-sub   { color: #3a3a3a; font-size: 10px; margin-top: 3px; letter-spacing: .04em; text-transform: uppercase; }
+    .badge        { margin-left: auto; color: #2a2a2a; font-size: 11px; font-family: monospace; }
+    .divider      { height: 1px; background: var(--border); margin-bottom: 16px; }
+
+    /* ── QR frame ────────────────────────────────────────── */
+    .qr-frame {
+      position: relative;
+      width: 256px; height: 256px;
+      align-self: center;
+      margin-bottom: 12px;
+    }
+    .corner {
+      position: absolute;
+      width: 16px; height: 16px;
+    }
+    .corner-tl { top: 8px; left: 8px;  border-top: 2px solid var(--green); border-left:  2px solid var(--green); border-radius: 3px 0 0 0; }
+    .corner-tr { top: 8px; right: 8px; border-top: 2px solid var(--green); border-right: 2px solid var(--green); border-radius: 0 3px 0 0; }
+    .corner-bl { bottom: 8px; left: 8px;  border-bottom: 2px solid var(--green); border-left:  2px solid var(--green); border-radius: 0 0 0 3px; }
+    .corner-br { bottom: 8px; right: 8px; border-bottom: 2px solid var(--green); border-right: 2px solid var(--green); border-radius: 0 0 3px 0; }
+    .qr-inner {
+      position: absolute; inset: 0;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Loading / error states ─────────────────────────── */
+    .centered { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .spinner {
+      width: 30px; height: 30px;
+      border: 2.5px solid #e0e0e0;
+      border-top: 2.5px solid var(--green);
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    .dim-text  { color: #888; font-size: 12px; }
+    .retry-btn {
+      margin-top: 4px;
+      padding: 5px 14px;
+      background: transparent;
+      border: 1px solid var(--green);
+      border-radius: 6px;
+      color: var(--green);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    /* ── Timer ───────────────────────────────────────────── */
+    .timer-row   { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .timer-track { flex: 1; height: 3px; background: #1c1c1c; border-radius: 99px; overflow: hidden; }
+    .timer-fill  { height: 100%; border-radius: 99px; transition: width 1s linear, background .3s, box-shadow .3s; }
+    .timer-label { font-size: 11px; font-variant-numeric: tabular-nums; min-width: 24px; text-align: right; }
+
+    /* ── Refresh button ──────────────────────────────────── */
+    .refresh-btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: 100%; padding: 9px 0;
+      background: transparent;
+      border: 1px solid var(--green2);
+      border-radius: 10px;
+      color: var(--green);
+      font-size: 13px; font-weight: 500;
+      letter-spacing: .01em;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .refresh-btn:hover:not(:disabled) { background: rgba(59,152,2,.09); }
+    .refresh-btn:disabled             { opacity: .45; cursor: not-allowed; }
+    .hint { color: #272727; font-size: 11px; text-align: center; margin-top: 13px; line-height: 1.6; }
+
+    /* ── Success card ─────────────────────────────────────── */
+    #success-card {
+      display: none;
+      padding: 48px 40px;
+      align-items: center;
+      gap: 16px;
+      animation: fadeUp .35s ease;
+    }
+    .success-ring {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: rgba(59,152,2,.13);
+      border: 1.5px solid var(--green);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .success-title { color: #fff; font-size: 18px; font-weight: 700; }
+    .success-sub   { color: #444; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<!-- ── QR card ─────────────────────────────────────────────── -->
+<div class="card" id="qr-card">
+
+  <div class="header">
+    <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+      <circle cx="50" cy="50" r="50" fill="#3b9802"/>
+      <circle cx="50" cy="50" r="42" fill="none" stroke="white" stroke-width="5"/>
+      <text x="50" y="68" text-anchor="middle" font-family="Arial Black,Arial" font-weight="900" font-size="52" fill="white">G</text>
+    </svg>
+    <div>
+      <div class="header-title">GREEN-API</div>
+      <div class="header-sub">Instance Authorization</div>
+    </div>
+    <div class="badge" id="instance-badge"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="qr-frame">
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+    <div class="qr-inner" id="qr-inner"></div>
+  </div>
+
+  <div class="timer-row">
+    <div class="timer-track"><div class="timer-fill" id="timer-fill" style="width:0%"></div></div>
+    <span class="timer-label" id="timer-label"></span>
+  </div>
+
+  <button class="refresh-btn" id="refresh-btn" onclick="doRefresh()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b9802" stroke-width="2.5" stroke-linecap="round">
+      <polyline points="23 4 23 10 17 10"/>
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+    </svg>
+    Refresh QR
+  </button>
+
+  <div class="hint">Open your messenger app and scan this QR code to link the instance</div>
+</div>
+
+<!-- ── Success card ────────────────────────────────────────── -->
+<div class="card" id="success-card">
+  <div class="success-ring">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  </div>
+  <div class="success-title">Instance Connected</div>
+  <div class="success-sub" id="success-sub">authorized</div>
+</div>
+
+<script>
+  // ── MCP Apps postMessage bridge ────────────────────────────
+  const QR_TTL = 55; // seconds before QR expires
+
+  let nextMsgId   = 1;
+  const pending   = {};
+
+  window.addEventListener('message', (e) => {
+    const msg = e.data;
+    if (!msg || msg.jsonrpc !== '2.0') return;
+
+    // Response to one of our requests
+    if (msg.id !== undefined && msg.id !== null && pending[msg.id]) {
+      const { resolve, reject } = pending[msg.id];
+      delete pending[msg.id];
+      if (msg.error) reject(msg.error); else resolve(msg.result ?? {});
+      return;
+    }
+
+    // Notification from host (no id)
+    if (msg.method) handleNotification(msg.method, msg.params ?? {});
+  });
+
+  function request(method, params) {
+    const id = nextMsgId++;
+    return new Promise((resolve, reject) => {
+      pending[id] = { resolve, reject };
+      window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*');
+    });
+  }
+
+  // ── State ──────────────────────────────────────────────────
+  let instanceId    = null;
+  let countdown     = null;
+  let cTimer        = null;  // countdown setInterval
+  let pollTimer     = null;  // state polling setInterval
+  let hostConnected = false; // true once we get any notification from host
+
+  // ── Notification handler ───────────────────────────────────
+  function handleNotification(method, params) {
+    if (method === 'ui/notifications/tool-input') {
+      hostConnected = true;
+      const args = params.arguments ?? {};
+      if (args.instance_id != null) {
+        instanceId = args.instance_id;
+        document.getElementById('instance-badge').textContent = '#' + instanceId;
+      }
+    }
+
+    if (method === 'ui/notifications/tool-result') {
+      hostConnected = true;
+      const content = params.content ?? [];
+
+      // Try image content first (legacy)
+      const img = content.find(c => c.type === 'image');
+      if (img) { showQR(img.data, img.mimeType); return; }
+
+      // Try JSON text: {"type":"qrCode","message":"<base64>"}
+      const text = content.filter(c => c.type === 'text').map(c => c.text).join('');
+      try {
+        const obj = JSON.parse(text);
+        if (obj.type === 'qrCode' && obj.message) {
+          showQR(obj.message, 'image/png');
+          return;
+        }
+        // alreadyLogged, notAuthorized, etc.
+        if (obj.type === 'alreadyLogged') { showAuthorized(); return; }
+        setError(obj.message || obj.type);
+      } catch {
+        setError(text || 'Unknown error');
+      }
+    }
+  }
+
+  // ── Extract human-readable reason from tool content ────────
+  function extractReason(content) {
+    const texts = (content ?? []).filter(c => c.type === 'text').map(c => c.text).join(' ');
+    if (!texts) return null;
+    // Try to parse JSON like {"type":"alreadyLogged","message":"..."} or {"isError":true,"content":[...]}
+    try {
+      const obj = JSON.parse(texts);
+      if (obj.message) return obj.message;
+      if (obj.type)    return obj.type;
+    } catch { /* plain text */ }
+    return texts.length <= 200 ? texts : texts.slice(0, 200) + '…';
+  }
+
+  // ── UI helpers ─────────────────────────────────────────────
+  function setLoading() {
+    const inner = document.getElementById('qr-inner');
+    inner.innerHTML = `<div class="centered"><div class="spinner"></div><div class="dim-text">Fetching QR code...</div></div>`;
+    document.getElementById('refresh-btn').disabled = true;
+  }
+
+  function setError(reason) {
+    const inner = document.getElementById('qr-inner');
+    const reasonHtml = reason
+      ? `<div class="dim-text" style="font-size:10px;color:#ff6b6b;max-width:180px;text-align:center;word-break:break-word">${escReason(reason)}</div>`
+      : '';
+    inner.innerHTML = `<div class="centered"><div style="font-size:28px;color:#ff4d4d;margin-bottom:6px">&#x2717;</div><div class="dim-text">Failed to load QR code</div>${reasonHtml}<button onclick="doRefresh()" class="retry-btn" style="margin-top:8px">Try again</button></div>`;
+    document.getElementById('refresh-btn').disabled = false;
+    stopCountdown();
+  }
+
+  function escReason(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showQR(base64, mimeType) {
+    const inner = document.getElementById('qr-inner');
+    inner.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = 'data:' + mimeType + ';base64,' + base64;
+    img.alt = 'Scan to authorize';
+    img.style.cssText = 'width:100%;height:100%;image-rendering:pixelated;display:block';
+    inner.appendChild(img);
+    document.getElementById('refresh-btn').disabled = false;
+    startCountdown();
+    startPoll();
+  }
+
+  function showAuthorized() {
+    stopCountdown();
+    stopPoll();
+    document.getElementById('qr-card').style.display = 'none';
+    const sc = document.getElementById('success-card');
+    sc.style.display = 'flex';
+    if (instanceId) document.getElementById('success-sub').textContent = '#' + instanceId + ' · authorized';
+  }
+
+  // ── Countdown ──────────────────────────────────────────────
+  function startCountdown() {
+    stopCountdown();
+    countdown = QR_TTL;
+    updateTimer();
+    cTimer = setInterval(() => {
+      countdown--;
+      if (countdown <= 0) { stopCountdown(); doRefresh(); }
+      else                 updateTimer();
+    }, 1000);
+  }
+
+  function stopCountdown() {
+    if (cTimer) { clearInterval(cTimer); cTimer = null; }
+    countdown = null;
+    document.getElementById('timer-label').textContent = '';
+    document.getElementById('timer-fill').style.width = '0%';
+  }
+
+  function updateTimer() {
+    const pct    = (countdown / QR_TTL) * 100;
+    const urgent = countdown < 10;
+    const fill   = document.getElementById('timer-fill');
+    const label  = document.getElementById('timer-label');
+    fill.style.width     = pct + '%';
+    fill.style.background  = urgent ? '#ff4d4d' : 'var(--green)';
+    fill.style.boxShadow   = urgent ? '0 0 6px #ff4d4d88' : '0 0 6px rgba(59,152,2,.53)';
+    label.textContent    = countdown + 's';
+    label.style.color    = urgent ? '#ff4d4d' : '#555';
+  }
+
+  // ── State polling ──────────────────────────────────────────
+  function startPoll() {
+    stopPoll();
+    pollTimer = setInterval(checkState, 3000);
+  }
+
+  function stopPoll() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  async function checkState() {
+    if (!instanceId) return;
+    try {
+      const res  = await request('tools/call', { name: 'whatsapp_get_state', arguments: { instance_id: instanceId } });
+      const text = (res?.content ?? []).filter(c => c.type === 'text').map(c => c.text).join('');
+      if (text.includes('"authorized"') || (text.includes('authorized') && !text.includes('notAuthorized'))) {
+        showAuthorized();
+      }
+    } catch { /* ignore */ }
+  }
+
+  // ── Refresh ────────────────────────────────────────────────
+  async function doRefresh() {
+    if (!instanceId) return;
+    setLoading();
+    stopCountdown();
+    try {
+      const res = await request('tools/call', { name: 'whatsapp_get_qr', arguments: { instance_id: instanceId } });
+      const content = res?.content ?? [];
+
+      // image content
+      const img = content.find(c => c.type === 'image');
+      if (img) { showQR(img.data, img.mimeType); return; }
+
+      // JSON text
+      const text = content.filter(c => c.type === 'text').map(c => c.text).join('');
+      try {
+        const obj = JSON.parse(text);
+        if (obj.type === 'qrCode' && obj.message) { showQR(obj.message, 'image/png'); return; }
+        if (obj.type === 'alreadyLogged') { showAuthorized(); return; }
+        setError(obj.message || obj.type);
+      } catch { setError(text || 'Unknown error'); }
+    } catch (err) {
+      const reason = err?.message || (typeof err === 'string' ? err : null);
+      setError(reason);
+    }
+  }
+
+  // ── Bootstrap ──────────────────────────────────────────────
+  setLoading();
+  request('ui/initialize', {
+    protocolVersion: '2026-01-26',
+    clientInfo: { name: 'GREEN-API QR', version: '1.0.0' },
+    capabilities: {}
+  }).then(() => {
+    hostConnected = true;
+    window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} }, '*');
+  }).catch(() => { /* connection errors are non-fatal */ });
+
+  // Timeout: if host never responds, show an error instead of infinite spinner
+  setTimeout(() => {
+    if (!hostConnected) {
+      setError('MCP App host did not respond. The widget requires a host that supports MCP Apps (ui:// resources).');
+    }
+  }, 5000);
+</script>
+</body>
+</html>

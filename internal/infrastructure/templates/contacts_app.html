@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GREEN-API Contacts</title>
+  <style>
+    :root {
+      --green:  #3b9802;
+      --green2: #2e7a01;
+      --bg:     #0c0c0c;
+      --card:   #131313;
+      --card2:  #181818;
+      --border: #1d1d1d;
+      --text:   #e8e8e8;
+      --muted:  #555;
+      --dim:    #333;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      height: 100%;
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    @keyframes spin    { to { transform: rotate(360deg); } }
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+    /* ── Shell ──────────────────────────────────────────── */
+    #shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header-title { color: var(--text); font-size: 14px; font-weight: 700; letter-spacing: .02em; line-height: 1; }
+    .header-sub   { color: #3a3a3a; font-size: 10px; margin-top: 3px; letter-spacing: .04em; text-transform: uppercase; }
+    .header-right { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+    .badge        { color: #2a2a2a; font-size: 11px; font-family: monospace; }
+    .count-badge  { color: var(--muted); font-size: 11px; }
+
+    /* ── Search ──────────────────────────────────────────── */
+    .search-wrap {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .search-box {
+      width: 100%;
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 10px 7px 30px;
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .search-box:focus { border-color: #2a2a2a; }
+    .search-box::placeholder { color: var(--dim); }
+    .search-wrap { position: relative; }
+    .search-icon {
+      position: absolute;
+      left: 22px; top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    /* ── List ────────────────────────────────────────────── */
+    #list-view {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #222 transparent;
+    }
+    #list-view::-webkit-scrollbar { width: 4px; }
+    #list-view::-webkit-scrollbar-thumb { background: #222; border-radius: 99px; }
+
+    .contact-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background .1s;
+      animation: fadeIn .2s ease;
+    }
+    .contact-item:hover { background: rgba(255,255,255,.03); }
+    .contact-item:last-child { border-bottom: none; }
+
+    .avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--dim);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 600; color: #888;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-group { background: rgba(59,152,2,.15); color: var(--green); }
+
+    .contact-body  { flex: 1; min-width: 0; }
+    .contact-name  { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contact-id    { font-size: 11px; color: var(--muted); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+    .type-badge {
+      font-size: 10px; padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+      letter-spacing: .03em;
+    }
+    .type-contact { background: rgba(59,152,2,.12); color: var(--green); }
+    .type-group   { background: rgba(255,255,255,.06); color: #666; }
+
+    .chevron { color: #333; flex-shrink: 0; }
+
+    /* ── Empty / loading / error states ─────────────────── */
+    .state-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 100%;
+      padding: 24px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 2.5px solid #222;
+      border-top: 2.5px solid var(--green);
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    .error-icon { font-size: 28px; color: #ff4d4d; }
+    .retry-btn  {
+      margin-top: 4px; padding: 5px 14px;
+      background: transparent; border: 1px solid var(--green);
+      border-radius: 6px; color: var(--green); font-size: 12px; cursor: pointer;
+    }
+    .empty-icon { font-size: 28px; }
+
+    /* ── Detail view ─────────────────────────────────────── */
+    #detail-view {
+      position: absolute; inset: 0;
+      background: var(--bg);
+      display: none;
+      flex-direction: column;
+      animation: slideIn .2s ease;
+      z-index: 10;
+    }
+    #detail-view.open { display: flex; }
+
+    .detail-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .back-btn {
+      background: none; border: none; cursor: pointer; color: var(--green);
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; padding: 0;
+    }
+    .detail-title { font-size: 13px; font-weight: 600; color: var(--text); }
+
+    .detail-body {
+      flex: 1; overflow-y: auto; padding: 20px 16px;
+      scrollbar-width: thin;
+      scrollbar-color: #222 transparent;
+    }
+    .detail-body::-webkit-scrollbar { width: 4px; }
+    .detail-body::-webkit-scrollbar-thumb { background: #222; border-radius: 99px; }
+
+    .detail-avatar-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      margin-bottom: 20px;
+    }
+    .detail-avatar {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: var(--dim);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: 700; color: #888;
+      overflow: hidden;
+    }
+    .detail-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .detail-name { font-size: 16px; font-weight: 700; color: var(--text); text-align: center; }
+    .detail-id   { font-size: 11px; color: var(--muted); font-family: monospace; text-align: center; margin-top: 2px; }
+
+    .detail-row {
+      display: flex; gap: 8px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: var(--muted); font-size: 11px; width: 80px; flex-shrink: 0; padding-top: 1px; }
+    .detail-value { color: var(--text); font-size: 12px; word-break: break-word; }
+
+    .send-btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: 100%; padding: 9px 0; margin-top: 18px;
+      background: transparent;
+      border: 1px solid var(--green2);
+      border-radius: 10px;
+      color: var(--green); font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .send-btn:hover { background: rgba(59,152,2,.09); }
+
+    .detail-loading {
+      display: flex; align-items: center; justify-content: center;
+      height: 120px;
+    }
+
+    /* ── Wrapper for position:absolute detail ─────────────── */
+    #app {
+      position: relative;
+      height: 100%;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Main: list view ──────────────────────────────────── -->
+  <div id="shell">
+    <div class="header">
+      <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
+        <circle cx="50" cy="50" r="50" fill="#3b9802"/>
+        <circle cx="50" cy="50" r="42" fill="none" stroke="white" stroke-width="5"/>
+        <text x="50" y="68" text-anchor="middle" font-family="Arial Black,Arial" font-weight="900" font-size="52" fill="white">G</text>
+      </svg>
+      <div>
+        <div class="header-title">GREEN-API</div>
+        <div class="header-sub">Contacts</div>
+      </div>
+      <div class="header-right">
+        <div class="badge" id="instance-badge"></div>
+        <div class="count-badge" id="count-badge"></div>
+      </div>
+    </div>
+
+    <div class="search-wrap">
+      <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="2.5" stroke-linecap="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input class="search-box" id="search" type="text" placeholder="Search by name or number…" oninput="onSearch(this.value)">
+    </div>
+
+    <div id="list-view">
+      <div class="state-center"><div class="spinner"></div><div>Loading contacts…</div></div>
+    </div>
+  </div>
+
+  <!-- ── Detail view (overlaid) ───────────────────────────── -->
+  <div id="detail-view">
+    <div class="detail-header">
+      <button class="back-btn" onclick="closeDetail()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <div class="detail-title" id="detail-title">Contact Info</div>
+    </div>
+    <div class="detail-body" id="detail-body">
+      <div class="detail-loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── MCP Apps postMessage bridge ────────────────────────────
+  let nextId = 1;
+  const pending = {};
+
+  window.addEventListener('message', (e) => {
+    const msg = e.data;
+    if (!msg || msg.jsonrpc !== '2.0') return;
+    if (msg.id != null && pending[msg.id]) {
+      const { resolve, reject } = pending[msg.id];
+      delete pending[msg.id];
+      msg.error ? reject(msg.error) : resolve(msg.result ?? {});
+      return;
+    }
+    if (msg.method) handleNotification(msg.method, msg.params ?? {});
+  });
+
+  function request(method, params) {
+    const id = nextId++;
+    return new Promise((resolve, reject) => {
+      pending[id] = { resolve, reject };
+      window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*');
+    });
+  }
+
+  // ── State ──────────────────────────────────────────────────
+  let instanceId = null;
+  let allContacts = [];
+  let filtered   = [];
+  let query       = '';
+
+  // ── Bootstrap ──────────────────────────────────────────────
+  request('ui/initialize', {
+    protocolVersion: '2026-01-26',
+    clientInfo: { name: 'GREEN-API Contacts', version: '1.0.0' },
+    capabilities: {}
+  }).then(() => {
+    // Signal host that we are ready to receive notifications (MCP Apps spec step 3)
+    window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} }, '*');
+  }).catch(() => {});
+
+  // ── Notification handler ───────────────────────────────────
+  function handleNotification(method, params) {
+    if (method === 'ui/notifications/tool-input') {
+      const args = params.arguments ?? {};
+      if (args.instance_id != null) {
+        instanceId = args.instance_id;
+        document.getElementById('instance-badge').textContent = '#' + instanceId;
+      }
+    }
+    if (method === 'ui/notifications/tool-result') {
+      const text = (params.content ?? []).find(c => c.type === 'text');
+      if (text) parseContacts(text.text);
+      else      showError();
+    }
+  }
+
+  // ── Parse & render contacts ────────────────────────────────
+  function parseContacts(raw) {
+    try {
+      const data = JSON.parse(raw);
+      allContacts = Array.isArray(data) ? data : [];
+    } catch {
+      allContacts = [];
+    }
+    // Sort: by name, groups last
+    allContacts.sort((a, b) => {
+      if (a.type === b.type) return (a.name || a.id || '').localeCompare(b.name || b.id || '');
+      return a.type === 'group' ? 1 : -1;
+    });
+    applyFilter(query);
+  }
+
+  function applyFilter(q) {
+    query = q.toLowerCase();
+    filtered = query
+      ? allContacts.filter(c => (c.name||'').toLowerCase().includes(query) || (c.id||'').includes(query))
+      : allContacts;
+    renderList();
+  }
+
+  function onSearch(q) { applyFilter(q); }
+
+  function renderList() {
+    const listEl = document.getElementById('list-view');
+    const countEl = document.getElementById('count-badge');
+
+    if (allContacts.length === 0 && query === '') {
+      listEl.innerHTML = '<div class="state-center"><div class="empty-icon">📭</div><div>No contacts found</div></div>';
+      countEl.textContent = '';
+      return;
+    }
+
+    countEl.textContent = query
+      ? filtered.length + ' of ' + allContacts.length
+      : allContacts.length + ' contacts';
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<div class="state-center"><div class="empty-icon">🔍</div><div>No matches for &ldquo;' + escHtml(query) + '&rdquo;</div></div>';
+      return;
+    }
+
+    listEl.innerHTML = filtered.map(c => {
+      const isGroup = c.type === 'group';
+      const initials = getInitials(c.name || c.id || '?');
+      return `<div class="contact-item" onclick="openDetail(${JSON.stringify(escHtml(c.id))}, ${JSON.stringify(escHtml(c.name || ''))})">
+        <div class="avatar ${isGroup ? 'avatar-group' : ''}">${initials}</div>
+        <div class="contact-body">
+          <div class="contact-name">${escHtml(c.name || c.id || '—')}</div>
+          <div class="contact-id">${escHtml(c.id || '')}</div>
+        </div>
+        <span class="type-badge ${isGroup ? 'type-group' : 'type-contact'}">${isGroup ? 'group' : 'contact'}</span>
+        <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>`;
+    }).join('');
+  }
+
+  function showError() {
+    document.getElementById('list-view').innerHTML =
+      '<div class="state-center"><div class="error-icon">✗</div><div>Failed to load contacts</div><button class="retry-btn" onclick="doRefresh()">Try again</button></div>';
+  }
+
+  async function doRefresh() {
+    if (!instanceId) return;
+    document.getElementById('list-view').innerHTML = '<div class="state-center"><div class="spinner"></div><div>Loading contacts…</div></div>';
+    try {
+      const res = await request('tools/call', { name: 'whatsapp_get_contacts', arguments: { instance_id: instanceId } });
+      const text = (res?.content ?? []).find(c => c.type === 'text');
+      if (text) parseContacts(text.text);
+      else      showError();
+    } catch { showError(); }
+  }
+
+  // ── Detail view ────────────────────────────────────────────
+  async function openDetail(chatId, displayName) {
+    const dv = document.getElementById('detail-view');
+    document.getElementById('detail-title').textContent = displayName || chatId;
+    document.getElementById('detail-body').innerHTML = '<div class="detail-loading"><div class="spinner"></div></div>';
+    dv.classList.add('open');
+
+    if (!instanceId) return;
+    try {
+      const res = await request('tools/call', {
+        name: 'whatsapp_get_contact_info',
+        arguments: { instance_id: instanceId, chat_id: chatId }
+      });
+      const text = (res?.content ?? []).find(c => c.type === 'text');
+      if (text) renderDetail(chatId, displayName, JSON.parse(text.text));
+      else      renderDetailError(chatId, displayName);
+    } catch { renderDetailError(chatId, displayName); }
+  }
+
+  function renderDetail(chatId, fallbackName, info) {
+    const name     = info.name || fallbackName || chatId;
+    const initial  = getInitials(name);
+    const isGroup  = info.isGroup;
+
+    let avatarHtml;
+    if (info.avatar) {
+      avatarHtml = `<img src="${escHtml(info.avatar)}" alt="" onerror="this.parentNode.textContent='${escHtml(initial)}'">`;
+    } else {
+      avatarHtml = escHtml(initial);
+    }
+
+    const rows = [
+      ['ID',          chatId],
+      info.description && ['Description', info.description],
+      info.email       && ['Email',       info.email],
+      info.category    && ['Category',    info.category],
+      ['Type',         isGroup ? 'Group' : 'Contact'],
+    ].filter(Boolean);
+
+    document.getElementById('detail-title').textContent = name;
+    document.getElementById('detail-body').innerHTML = `
+      <div class="detail-avatar-wrap">
+        <div class="detail-avatar ${isGroup ? 'avatar-group' : ''}">${avatarHtml}</div>
+        <div class="detail-name">${escHtml(name)}</div>
+        <div class="detail-id">${escHtml(chatId)}</div>
+      </div>
+      ${rows.map(([label, val]) => `
+        <div class="detail-row">
+          <div class="detail-label">${escHtml(label)}</div>
+          <div class="detail-value">${escHtml(String(val))}</div>
+        </div>`).join('')}
+      <button class="send-btn" onclick="sendMessageContext(${JSON.stringify(escHtml(chatId))}, ${JSON.stringify(escHtml(name))})">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Send message
+      </button>`;
+  }
+
+  function renderDetailError(chatId, fallbackName) {
+    document.getElementById('detail-body').innerHTML = `
+      <div class="detail-avatar-wrap">
+        <div class="detail-avatar">${escHtml(getInitials(fallbackName || chatId))}</div>
+        <div class="detail-name">${escHtml(fallbackName || chatId)}</div>
+        <div class="detail-id">${escHtml(chatId)}</div>
+      </div>
+      <div class="state-center" style="height:80px">
+        <div style="color:var(--muted);font-size:12px">Could not load contact details</div>
+      </div>
+      <button class="send-btn" onclick="sendMessageContext(${JSON.stringify(escHtml(chatId))}, ${JSON.stringify(escHtml(fallbackName || ''))})">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Send message
+      </button>`;
+  }
+
+  function closeDetail() {
+    document.getElementById('detail-view').classList.remove('open');
+  }
+
+  // Inject a user message suggesting to send a message to this contact
+  async function sendMessageContext(chatId, name) {
+    const label = name || chatId;
+    try {
+      await request('ui/message', {
+        role: 'user',
+        content: [{ type: 'text', text: `Send a message to ${label} (${chatId})` }]
+      });
+    } catch { /* non-fatal */ }
+  }
+
+  // ── Utils ──────────────────────────────────────────────────
+  function getInitials(str) {
+    const parts = str.replace(/@.+/, '').trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return str.replace(/@.+/, '').substring(0, 2).toUpperCase();
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+</script>
+</body>
+</html>

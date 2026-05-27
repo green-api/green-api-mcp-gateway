@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect — GREEN-API</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f0f4ee;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:36px;width:100%;max-width:440px}
+
+.logo-wrap{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.logo-wrap img{width:44px;height:44px;border-radius:50%}
+.logo-name{font-size:1.1rem;font-weight:700;color:#1a1a1a}
+
+h1{font-size:1.15rem;font-weight:700;color:#1a1a1a;margin-bottom:4px}
+p.sub{font-size:.875rem;color:#666;margin-bottom:20px;line-height:1.5}
+
+.steps{background:#f6faf2;border:1.5px solid #d4edcc;border-radius:10px;padding:14px 16px;margin-bottom:22px}
+.steps-title{font-size:.78rem;font-weight:700;color:#3a9400;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+.steps ol{padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.steps li{font-size:.85rem;color:#444;line-height:1.45}
+.steps a{color:#3a9400;font-weight:600;text-decoration:none}
+.steps a:hover{text-decoration:underline}
+
+.field{margin-bottom:16px}
+label{display:block;font-size:.8rem;font-weight:600;color:#444;margin-bottom:5px}
+.hint{font-size:.75rem;color:#888;margin-top:4px}
+.input-wrap{position:relative}
+input[type=text],input[type=password]{width:100%;padding:11px 14px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:.95rem;color:#1a1a1a;background:#fafafa;transition:border-color .15s,box-shadow .15s}
+input:focus{outline:none;border-color:#3a9400;box-shadow:0 0 0 3px rgba(58,148,0,.15);background:#fff}
+.toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#999;padding:2px;display:flex;align-items:center}
+.toggle:hover{color:#555}
+
+button[type=submit]{width:100%;padding:13px;background:#3a9400;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;transition:background .15s,transform .1s;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px}
+button[type=submit]:hover:not(:disabled){background:#2e7500}
+button[type=submit]:active:not(:disabled){transform:scale(.98)}
+button[type=submit]:disabled{background:#3a9400;opacity:.8;cursor:not-allowed}
+
+/* loading dots */
+.dots{display:none;gap:5px;align-items:center;justify-content:center;padding:10px 0}
+.dots span{width:8px;height:8px;border-radius:50%;background:#3a9400;animation:bounce .9s infinite ease-in-out}
+.dots span:nth-child(2){animation-delay:.15s}
+.dots span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,80%,100%{transform:scale(0.6);opacity:.5}40%{transform:scale(1);opacity:1}}
+
+/* success checkmark */
+.success{display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:12px 0}
+.success-circle{width:56px;height:56px;border-radius:50%;background:#3a9400;display:flex;align-items:center;justify-content:center;animation:pop .35s ease-out}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+.success-circle svg{width:28px;height:28px}
+.success-text{font-size:.95rem;font-weight:600;color:#3a9400}
+
+.error{background:#fff8f0;border:1.5px solid #f5c077;border-radius:10px;padding:10px 14px;color:#8a4800;font-size:.875rem;margin-bottom:18px;display:flex;gap:8px;align-items:flex-start}
+
+.footer{font-size:.8rem;color:#999;margin-top:18px;text-align:center}
+.footer a{color:#3a9400;text-decoration:none;font-weight:600}
+.footer a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-wrap">
+    <img src="{{.LogoDataURL}}" alt="GREEN-API">
+    <span class="logo-name">GREEN-API</span>
+  </div>
+
+  <h1>Connect your account</h1>
+  <p class="sub">Authorize access to your GREEN-API instance.</p>
+
+  <div class="steps" id="steps">
+    <div class="steps-title">How to get your credentials</div>
+    <ol>
+      <li>Open <a href="https://console.green-api.com/instanceList" target="_blank">console.green-api.com</a> and sign in</li>
+      <li>Select an instance (or create a new one)</li>
+      <li>Copy the <strong>Instance ID</strong> and <strong>API Token</strong> from the instance page</li>
+      <li>Make sure your instance is active (green status)</li>
+    </ol>
+  </div>
+
+  {{if .Error}}<div class="error" id="static-error"><span>&#9888;</span><span>{{.Error}}</span></div>{{end}}
+  <div class="error" id="ajax-error" style="display:none"><span>&#9888;</span><span id="ajax-error-text"></span></div>
+
+  <div class="dots" id="loading"><span></span><span></span><span></span></div>
+  <div class="success" id="success">
+    <div class="success-circle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <span class="success-text">Connected!</span>
+  </div>
+
+  <form id="auth-form" method="POST">
+    <input type="hidden" name="client_id" value="{{.ClientID}}">
+    <input type="hidden" name="redirect_uri" value="{{.RedirectURI}}">
+    <input type="hidden" name="code_challenge" value="{{.CodeChallenge}}">
+    <input type="hidden" name="code_challenge_method" value="{{.CodeChallengeMethod}}">
+    <input type="hidden" name="state" value="{{.State}}">
+
+    <div class="field">
+      <label for="instance_id">Instance ID</label>
+      <input type="text" id="instance_id" name="instance_id"
+             placeholder="1234567890" autocomplete="username"
+             required value="{{.InstanceID}}">
+      <div class="hint">A number like <code>1234567890</code> — found at the top of your instance page</div>
+    </div>
+
+    <div class="field">
+      <label for="api_token">API Token</label>
+      <div class="input-wrap">
+        <input type="password" id="api_token" name="api_token"
+               autocomplete="current-password" required placeholder="••••••••••••••••">
+        <button type="button" class="toggle" onclick="toggleToken()" aria-label="Show/hide token">
+          <svg id="eye-show" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg id="eye-hide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
+      <div class="hint">Found on your instance page under "API Token"</div>
+    </div>
+
+    <button type="submit" id="submit-btn">Connect</button>
+  </form>
+
+  <p class="footer">No account? <a href="https://green-api.com" target="_blank">Sign up at green-api.com</a></p>
+</div>
+<script>
+function toggleToken() {
+  var inp = document.getElementById('api_token');
+  var show = document.getElementById('eye-show');
+  var hide = document.getElementById('eye-hide');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    show.style.display = 'none';
+    hide.style.display = '';
+  } else {
+    inp.type = 'password';
+    show.style.display = '';
+    hide.style.display = 'none';
+  }
+}
+
+document.getElementById('auth-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  var form = e.target;
+  var steps = document.getElementById('steps');
+  var btn = document.getElementById('submit-btn');
+  var loading = document.getElementById('loading');
+  var success = document.getElementById('success');
+  var ajaxErr = document.getElementById('ajax-error');
+  var ajaxErrText = document.getElementById('ajax-error-text');
+  var staticErr = document.getElementById('static-error');
+
+  // hide previous errors, instructions and form — show loading
+  ajaxErr.style.display = 'none';
+  if (staticErr) staticErr.style.display = 'none';
+  steps.style.display = 'none';
+  form.style.display = 'none';
+  loading.style.display = 'flex';
+
+  try {
+    var resp = await fetch('', {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'fetch',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams(new FormData(form))
+    });
+
+    var data = await resp.json();
+
+    if (resp.ok && data.redirect) {
+      // success — show checkmark, then follow redirect
+      loading.style.display = 'none';
+      success.style.display = 'flex';
+      setTimeout(function() { window.location.href = data.redirect; }, 1200);
+    } else {
+      // error — restore instructions and form with error message
+      loading.style.display = 'none';
+      steps.style.display = '';
+      form.style.display = '';
+      ajaxErrText.textContent = data.error || 'Something went wrong, please try again';
+      ajaxErr.style.display = 'flex';
+    }
+  } catch(err) {
+    loading.style.display = 'none';
+    steps.style.display = '';
+    form.style.display = '';
+    ajaxErrText.textContent = 'Network error — please try again';
+    ajaxErr.style.display = 'flex';
+  }
+});
+</script>
+</body>
+</html>

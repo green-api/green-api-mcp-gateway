@@ -1,0 +1,24 @@
+# Binaries
+green-api-mcp-gateway
+green-api-mcp-gateway-linux
+*.exe
+
+# Test artifacts
+test-all-25.py
+test-all-methods.py
+/tmp/
+
+# Config with secrets
+config.yaml
+!config/config.example.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+
