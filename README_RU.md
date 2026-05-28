@@ -18,11 +18,15 @@
 [![News](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/green_api)
 [![News](https://img.shields.io/badge/WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://whatsapp.com/channel/0029VaHUM5TBA1f7cG29nO1C)
 
+---
+
 MCP-шлюз для GREEN-API WhatsApp. Позволяет агентам ИИ (Claude Desktop, OpenClaw, Cursor и другие) отправлять сообщения, управлять инстансами и получать уведомления через WhatsApp, используя [Model Context Protocol](https://modelcontextprotocol.io).
 
 ## Функциональные возможности
 
 Отправка текстовых сообщений, файлов по URL, геолокаций, контактов и опросов. Пересылка и редактирование сообщений. Создание групп, получение данных о группах, добавление и удаление участников. Проверка номеров телефонов на наличие WhatsApp, получение списка контактов и информации о них. Получение статуса и настроек инстанса, генерация QR-кода для авторизации. Получение входящих уведомлений через метод длинных опросов (polling) или HTTP-вебхуки (receiver). Создание и удаление инстансов. Поддержка работы с несколькими инстансами в рамках одного шлюза. Готовые шаблоны для распространенных сценариев (клиентская поддержка, рассылки). Метрики Prometheus и интеграция с OpenTelemetry.
+
+С инструкцией по подключению MCP сервера можно ознакомиться [на нашем сайте](https://green-api.com/docs/integration/mcp/integration-setup/)
 
 ## Архитектура
 
@@ -183,6 +187,8 @@ docker run --rm -i \
 
 ### Сообщения
 
+[*Ссылка на документацию*](https://green-api.com/docs/integration/mcp/tools/#_3)
+
 - `whatsapp_send_message` — текстовое сообщение
 - `whatsapp_send_file` — файл по URL
 - `whatsapp_send_location` — геолокация
@@ -194,6 +200,8 @@ docker run --rm -i \
 
 ### Инстанс
 
+[*Ссылка на документацию*](https://green-api.com/docs/integration/mcp/tools/#_2)
+
 - `whatsapp_get_state` — статус авторизации
 - `whatsapp_get_settings` — текущие настройки
 - `whatsapp_set_settings` — обновление настроек
@@ -203,11 +211,15 @@ docker run --rm -i \
 
 ### Контакты
 
+[*Ссылка на документацию*](https://green-api.com/docs/integration/mcp/tools/#_7)
+
 - `whatsapp_get_contacts` — список контактов
 - `whatsapp_get_contact_info` — информация о контакте
 - `whatsapp_check_whatsapp` — проверка номера телефона на наличие WhatsApp
 
 ### Группы
+
+[*Ссылка на документацию*](https://green-api.com/docs/integration/mcp/tools/#_9)
 
 - `whatsapp_create_group` — создание группы
 - `whatsapp_get_group_data` — данные группы
@@ -217,9 +229,13 @@ docker run --rm -i \
 
 ### Уведомления
 
+[*Ссылка на документацию*](https://green-api.com/docs/integration/mcp/tools/#_6)
+
 - `whatsapp_receive_notification` — получение входящего уведомления (long-poll)
 
 ### Партнёрские методы
+
+[*Ссылка на документацию*](https://green-api.com/docs/integration/mcp/tools/#api)
 
 - `whatsapp_create_instance` — создание инстанса
 - `whatsapp_delete_instance` — удаление инстанса

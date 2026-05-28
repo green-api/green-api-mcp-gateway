@@ -1,12 +1,12 @@
 # green-api-mcp-gateway
 
-- [Документация на русском](README_RU.md) 
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/green-api/green-api-mcp-gateway/main)](https://go.dev/)
 [![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/green-api/green-api-mcp-gateway?label=release)](https://github.com/green-api/green-api-mcp-gateway/tags)
 [![Protocol: MCP](https://img.shields.io/badge/Protocol-MCP-orange.svg)](https://modelcontextprotocol.io)
 [![Go Report Card](https://goreportcard.com/badge/github.com/green-api/green-api-mcp-gateway)](https://goreportcard.com/report/github.com/green-api/green-api-mcp-gateway)
+
+- [Документация на русском](README_RU.md) 
 
 ## Support Links
 
@@ -20,11 +20,15 @@
 [![News](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/green_api)
 [![News](https://img.shields.io/badge/WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://whatsapp.com/channel/0029VaLj6J4LNSa2B5Jx6s3h)
 
+---
+
 MCP gateway for GREEN-API WhatsApp. Lets AI agents (Claude Desktop, OpenClaw, Cursor, and others) send messages, manage instances, and receive notifications via WhatsApp using the [Model Context Protocol](https://modelcontextprotocol.io).
 
 ## What it does
 
 Send text messages, files by URL, locations, contacts, polls. Forward and edit messages. Manage groups (create, fetch data, add/remove participants). Check phone numbers for WhatsApp, fetch contacts and their info. Get instance state and settings, QR code for authorization. Receive incoming notifications via polling or an HTTP receiver. Partner API for creating/deleting instances. Multi-instance support in a single gateway. Prompt templates for common scenarios (customer support, broadcasts). Prometheus metrics and OpenTelemetry.
+
+Instructions for connecting the MCP server can be found on [our website](https://green-api.com/en/docs/integration/mcp/integration-setup/)
 
 ## Architecture
 
@@ -184,6 +188,8 @@ docker run --rm -i \
 
 ### Messaging
 
+[*Link to documentation*](https://green-api.com/en/docs/integration/mcp/tools/#sending-messages)
+
 - `whatsapp_send_message` — text message
 - `whatsapp_send_file` — file by URL
 - `whatsapp_send_location` — location
@@ -195,6 +201,8 @@ docker run --rm -i \
 
 ### Instance
 
+[*Link to documentation*](https://green-api.com/en/docs/integration/mcp/tools/#instance-management)
+
 - `whatsapp_get_state` — authorization state
 - `whatsapp_get_settings` — current settings
 - `whatsapp_set_settings` — update settings
@@ -204,11 +212,15 @@ docker run --rm -i \
 
 ### Contacts
 
+[*Link to documentation*](https://green-api.com/en/docs/integration/mcp/tools/#contacts)
+
 - `whatsapp_get_contacts` — contact list
 - `whatsapp_get_contact_info` — contact information
 - `whatsapp_check_whatsapp` — phone number check
 
 ### Groups
+
+[*Link to documentation*](https://green-api.com/en/docs/integration/mcp/tools/#groups)
 
 - `whatsapp_create_group` — create a group
 - `whatsapp_get_group_data` — group data
@@ -218,9 +230,13 @@ docker run --rm -i \
 
 ### Notifications
 
+[*Link to documentation*](https://green-api.com/en/docs/integration/mcp/tools/#notification-queue)
+
 - `whatsapp_receive_notification` — receive an incoming notification (long-poll)
 
 ### Partner API
+
+[*Link to documentation*](https://green-api.com/en/docs/integration/mcp/tools/#partner-api)
 
 - `whatsapp_create_instance` — create an instance
 - `whatsapp_delete_instance` — delete an instance
