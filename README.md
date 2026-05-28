@@ -28,8 +28,8 @@ MCP gateway for GREEN-API WhatsApp. Lets AI agents (Claude Desktop, OpenClaw, Cu
 
 Send text messages, files by URL, locations, contacts, polls. Forward and edit messages. Manage groups (create, fetch data, add/remove participants). Check phone numbers for WhatsApp, fetch contacts and their info. Get instance state and settings, QR code for authorization. Receive incoming notifications via polling or an HTTP receiver. Partner API for creating/deleting instances. Multi-instance support in a single gateway. Prompt templates for common scenarios (customer support, broadcasts). Prometheus metrics and OpenTelemetry.
 
-You can find REST API documentation by [link](https://green-api.com/docs/api/).
-Instructions for connecting the MCP server can be found on the website [https://green-api.com/](https://green-api.com/en/docs/integration/mcp/integration-setup/)
+You can find REST API documentation by [link](https://green-api.com/docs/api/).   
+Instructions for connecting the MCP server can be found on [our website](https://green-api.com/en/docs/integration/mcp/integration-setup/)
 
 ## Architecture
 
