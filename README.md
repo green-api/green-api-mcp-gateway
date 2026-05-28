@@ -1,12 +1,12 @@
 # green-api-mcp-gateway
 
-- [Документация на русском](README_RU.md) 
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/green-api/green-api-mcp-gateway/main)](https://go.dev/)
 [![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/green-api/green-api-mcp-gateway?label=release)](https://github.com/green-api/green-api-mcp-gateway/tags)
 [![Protocol: MCP](https://img.shields.io/badge/Protocol-MCP-orange.svg)](https://modelcontextprotocol.io)
 [![Go Report Card](https://goreportcard.com/badge/github.com/green-api/green-api-mcp-gateway)](https://goreportcard.com/report/github.com/green-api/green-api-mcp-gateway)
+
+- [Документация на русском](README_RU.md) 
 
 ## Support Links
 
