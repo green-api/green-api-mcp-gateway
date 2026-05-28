@@ -1,5 +1,25 @@
 # green-api-mcp-gateway
 
+- [Документация на русском](README_RU.md) 
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/green-api/green-api-mcp-gateway/main)](https://go.dev/)
+[![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/green-api/green-api-mcp-gateway?label=release)](https://github.com/green-api/green-api-mcp-gateway/tags)
+[![Protocol: MCP](https://img.shields.io/badge/Protocol-MCP-orange.svg)](https://modelcontextprotocol.io)
+[![Go Report Card](https://goreportcard.com/badge/github.com/green-api/green-api-mcp-gateway)](https://goreportcard.com/report/github.com/green-api/green-api-mcp-gateway)
+
+## Support Links
+
+[![Support](https://img.shields.io/badge/support@green--api.com-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:support@green-api.com)
+[![Support](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/greenapi_support_eng_bot)
+[![Support](https://img.shields.io/badge/WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://wa.me/77780739095)
+
+## Guides & News
+
+[![Guides](https://img.shields.io/badge/YouTube-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white)](https://www.youtube.com/@greenapi-en)
+[![News](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/green_api)
+[![News](https://img.shields.io/badge/WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://whatsapp.com/channel/0029VaLj6J4LNSa2B5Jx6s3h)
+
 MCP gateway for GREEN-API WhatsApp. Lets AI agents (Claude Desktop, OpenClaw, Cursor, and others) send messages, manage instances, and receive notifications via WhatsApp using the [Model Context Protocol](https://modelcontextprotocol.io).
 
 ## What it does
