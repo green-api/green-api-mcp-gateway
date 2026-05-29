@@ -12,6 +12,10 @@ test-all-methods.py
 config.yaml
 !config/config.example.yaml
 
+# MCP Registry DNS-auth private key
+key.pem
+*.pem
+
 # IDE
 .idea/
 .vscode/
