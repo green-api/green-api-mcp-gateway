@@ -624,15 +624,6 @@ func registerTools(s *Server) {
 	)
 
 	// whatsapp_get_qr
-	qrTool := mcp.NewTool("whatsapp_get_qr",
-		mcp.WithDescription("Get QR code for instance authorization. Returns the QR image inline \u2014 scan it in your messenger app to link the instance."),
-		mcp.WithNumber("instance_id", mcp.Description("Instance ID (not required when authenticated via OAuth)")),
-	)
-	qrTool.Meta = &mcp.Meta{
-		AdditionalFields: map[string]any{
-			"ui": map[string]any{"resourceUri": "ui://qr"},
-		},
-	}
 	s.addTool(
 		mcp.NewTool("whatsapp_get_qr",
 			mcp.WithDescription("Get the QR code for instance authorization"),
@@ -657,11 +648,13 @@ func registerTools(s *Server) {
 					small = qr.Message // fallback to original
 				}
 				res := mcp.NewToolResultImage("Scan this QR code to authorize the instance", small, "image/png")
-				res.Meta = &mcp.Meta{AdditionalFields: map[string]any{"ui": map[string]any{"resourceUri": "ui://qr"}}}
+				res.Meta = qrToolResultMeta(small, "image/png")
+				res.StructuredContent = map[string]any{"type": "qrCode", "message": small, "mimeType": "image/png"}
 				return res, nil
 			}
 			res := mcp.NewToolResultText(fmt.Sprintf(`{"type":%q,"message":%q}`, qr.Type, qr.Message))
 			res.Meta = &mcp.Meta{AdditionalFields: map[string]any{"ui": map[string]any{"resourceUri": "ui://qr"}}}
+			res.StructuredContent = map[string]any{"type": qr.Type, "message": qr.Message}
 			return res, nil
 		}),
 	)
@@ -695,15 +688,6 @@ func registerTools(s *Server) {
 	)
 
 	// whatsapp_get_contacts
-	contactsTool := mcp.NewTool("whatsapp_get_contacts",
-		mcp.WithDescription("Get the contact list"),
-		mcp.WithNumber("instance_id", mcp.Description("Instance ID (not required when authenticated via OAuth)")),
-	)
-	contactsTool.Meta = &mcp.Meta{
-		AdditionalFields: map[string]any{
-			"ui": map[string]any{"resourceUri": "ui://contacts"},
-		},
-	}
 	s.addTool(
 		mcp.NewTool("whatsapp_get_contacts",
 			mcp.WithDescription("Get the contact list"),
@@ -1012,10 +996,10 @@ func registerTools(s *Server) {
 	// whatsapp_get_chat_history
 	s.addTool(
 		mcp.NewTool("whatsapp_get_chat_history",
-			mcp.WithDescription("Get chat message history"),
+			mcp.WithDescription("Get chat message history. Use a small 'count' (default 50, max 100) to keep responses focused."),
 			mcp.WithNumber("instance_id", mcp.Required(), mcp.Description("WhatsApp instance ID")),
 			mcp.WithString("chat_id", mcp.Required(), mcp.Description("Chat ID (79001234567@c.us or 120363XXX@g.us)")),
-			mcp.WithNumber("count", mcp.Description("Number of messages (default 100)")),
+			mcp.WithNumber("count", mcp.Description("Number of messages (default 50, max 100)")),
 		),
 		mcpgo.ToolHandlerFunc(func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			instanceID, err := resolveInstanceID(ctx, req)
@@ -1026,7 +1010,13 @@ func registerTools(s *Server) {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			count := int(req.GetFloat("count", 100))
+			count := int(req.GetFloat("count", 50))
+			if count < 1 {
+				count = 50
+			}
+			if count > 100 {
+				count = 100
+			}
 			body := domain.GetChatHistoryRequest{ChatID: chatID, Count: count}
 			result, err := s.client.GetChatHistory(ctx, instanceID, body)
 			if err != nil {
@@ -1069,16 +1059,22 @@ func registerTools(s *Server) {
 	// whatsapp_last_incoming_messages
 	s.addTool(
 		mcp.NewTool("whatsapp_last_incoming_messages",
-			mcp.WithDescription("Get recent incoming messages"),
+			mcp.WithDescription("Get recent incoming messages from the last N minutes (default 60, max 1440 = 24 hours)."),
 			mcp.WithNumber("instance_id", mcp.Required(), mcp.Description("WhatsApp instance ID")),
-			mcp.WithNumber("minutes", mcp.Description("Time window in minutes (default 1440 = 24 hours)")),
+			mcp.WithNumber("minutes", mcp.Description("Time window in minutes (default 60, max 1440)")),
 		),
 		mcpgo.ToolHandlerFunc(func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			instanceID, err := resolveInstanceID(ctx, req)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			minutes := int(req.GetFloat("minutes", 1440))
+			minutes := int(req.GetFloat("minutes", 60))
+			if minutes < 1 {
+				minutes = 60
+			}
+			if minutes > 1440 {
+				minutes = 1440
+			}
 			result, err := s.client.LastIncomingMessages(ctx, instanceID, minutes)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
@@ -1090,16 +1086,22 @@ func registerTools(s *Server) {
 	// whatsapp_last_outgoing_messages
 	s.addTool(
 		mcp.NewTool("whatsapp_last_outgoing_messages",
-			mcp.WithDescription("Get recent outgoing messages"),
+			mcp.WithDescription("Get recent outgoing messages from the last N minutes (default 60, max 1440 = 24 hours)."),
 			mcp.WithNumber("instance_id", mcp.Required(), mcp.Description("WhatsApp instance ID")),
-			mcp.WithNumber("minutes", mcp.Description("Time window in minutes (default 1440 = 24 hours)")),
+			mcp.WithNumber("minutes", mcp.Description("Time window in minutes (default 60, max 1440)")),
 		),
 		mcpgo.ToolHandlerFunc(func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			instanceID, err := resolveInstanceID(ctx, req)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			minutes := int(req.GetFloat("minutes", 1440))
+			minutes := int(req.GetFloat("minutes", 60))
+			if minutes < 1 {
+				minutes = 60
+			}
+			if minutes > 1440 {
+				minutes = 1440
+			}
 			result, err := s.client.LastOutgoingMessages(ctx, instanceID, minutes)
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
@@ -1351,6 +1353,17 @@ func registerTools(s *Server) {
 // marshalJSON marshals a value to JSON bytes.
 func marshalJSON(v any) ([]byte, error) {
 	return json.Marshal(v)
+}
+
+func qrToolResultMeta(base64, mimeType string) *mcp.Meta {
+	return &mcp.Meta{AdditionalFields: map[string]any{
+		"ui": map[string]any{"resourceUri": "ui://qr"},
+		"qr": map[string]any{
+			"type":     "qrCode",
+			"message":  base64,
+			"mimeType": mimeType,
+		},
+	}}
 }
 
 // resolveInstanceID returns the instance ID for a tool call.

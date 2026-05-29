@@ -128,6 +128,7 @@ The variables below cover both deployment modes. Credentials variables (`GREEN_A
 - `GREEN_API_TRANSPORT` — transport: `stdio`, `sse`, `http`, or `hybrid`
 - `GREEN_API_PORT` — HTTP port (defaults to `8090`)
 - `GREEN_API_BASE_URL` — public base URL (used for OAuth issuer/redirects, e.g. `https://mcp.example.com`)
+- `GREEN_API_WIDGET_DOMAIN` — unique widget origin for ChatGPT Apps submission metadata (defaults to `GREEN_API_BASE_URL`, then `https://mcp.green-api.com`)
 - `GREEN_API_AUTH_MODE` — `config` or `proxy`
 - `GREEN_API_AUTH_CACHE_TTL` — proxy-auth credential cache TTL (seconds)
 - `GREEN_API_WEBHOOK_MODE` — `polling` or `receiver`

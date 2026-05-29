@@ -6,6 +6,8 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/green-api/green-api-mcp-gateway/internal/domain"
 	"github.com/green-api/green-api-mcp-gateway/internal/infrastructure"
@@ -24,14 +26,18 @@ import (
 //   - whatsapp://instance/{id}/settings — settings of an instance
 func registerResources(s *Server) {
 	// ui://qr — MCP App widget for instance authorization via QR code
+	qrMeta := widgetResourceMeta("Interactive QR code widget for authorizing a GREEN-API instance", []string{})
+	qrResource := mcp.NewResource("ui://qr", "QR Code Widget",
+		mcp.WithMIMEType("text/html;profile=mcp-app"),
+		mcp.WithResourceDescription("Interactive QR code widget for authorizing a GREEN-API instance"),
+	)
+	qrResource.Meta = mcp.NewMetaFromMap(qrMeta)
 	s.mcp.AddResource(
-		mcp.NewResource("ui://qr", "QR Code Widget",
-			mcp.WithMIMEType("text/html;profile=mcp-app"),
-			mcp.WithResourceDescription("Interactive QR code widget for authorizing a GREEN-API instance"),
-		),
+		qrResource,
 		mcpgo.ResourceHandlerFunc(func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 			return []mcp.ResourceContents{
 				mcp.TextResourceContents{
+					Meta:     qrMeta,
 					URI:      "ui://qr",
 					MIMEType: "text/html;profile=mcp-app",
 					Text:     infrastructure.QRAppHTML,
@@ -41,14 +47,18 @@ func registerResources(s *Server) {
 	)
 
 	// ui://contacts — MCP App widget for browsing the contacts list
+	contactsMeta := widgetResourceMeta("Interactive contacts list with search and contact details", []string{"https://pps.whatsapp.net"})
+	contactsResource := mcp.NewResource("ui://contacts", "Contacts List Widget",
+		mcp.WithMIMEType("text/html;profile=mcp-app"),
+		mcp.WithResourceDescription("Interactive contacts list with search and contact details"),
+	)
+	contactsResource.Meta = mcp.NewMetaFromMap(contactsMeta)
 	s.mcp.AddResource(
-		mcp.NewResource("ui://contacts", "Contacts List Widget",
-			mcp.WithMIMEType("text/html;profile=mcp-app"),
-			mcp.WithResourceDescription("Interactive contacts list with search and contact details"),
-		),
+		contactsResource,
 		mcpgo.ResourceHandlerFunc(func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 			return []mcp.ResourceContents{
 				mcp.TextResourceContents{
+					Meta:     contactsMeta,
 					URI:      "ui://contacts",
 					MIMEType: "text/html;profile=mcp-app",
 					Text:     infrastructure.ContactsAppHTML,
@@ -113,6 +123,42 @@ func registerResources(s *Server) {
 			}, nil
 		}),
 	)
+}
+
+func widgetResourceMeta(description string, resourceDomains []string) map[string]any {
+	domain := strings.TrimRight(os.Getenv("GREEN_API_WIDGET_DOMAIN"), "/")
+	if domain == "" {
+		domain = strings.TrimRight(os.Getenv("GREEN_API_BASE_URL"), "/")
+	}
+	if domain == "" {
+		domain = "https://mcp.green-api.com"
+	}
+
+	apiURL := strings.TrimRight(os.Getenv("GREEN_API_URL"), "/")
+	if apiURL == "" {
+		apiURL = "https://api.green-api.com"
+	}
+	connectDomains := []string{apiURL}
+	standardCSP := map[string]any{
+		"connectDomains":  connectDomains,
+		"resourceDomains": resourceDomains,
+	}
+	legacyCSP := map[string]any{
+		"connect_domains":  connectDomains,
+		"resource_domains": resourceDomains,
+	}
+
+	return map[string]any{
+		"ui": map[string]any{
+			"prefersBorder": true,
+			"csp":           standardCSP,
+			"domain":        domain,
+		},
+		"openai/widgetDescription":   description,
+		"openai/widgetPrefersBorder": true,
+		"openai/widgetCSP":           legacyCSP,
+		"openai/widgetDomain":        domain,
+	}
 }
 
 // extractInstanceID parses the {id} variable from a resource URI template match.

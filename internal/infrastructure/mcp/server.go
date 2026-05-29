@@ -88,6 +88,9 @@ func resolveToolIcon() *mcp.Icon {
 // addTool registers a tool and wraps its handler with rate limiting + metrics instrumentation.
 // It automatically injects the GREEN-API icon into the tool metadata when configured.
 func (s *Server) addTool(tool mcp.Tool, handler mcpgo.ToolHandlerFunc) {
+	applySubmissionReviewHints(&tool)
+	applyToolTitle(&tool)
+	applyWidgetToolMeta(&tool)
 	if s.toolIcon != nil {
 		tool.Icons = append(tool.Icons, *s.toolIcon)
 	}
@@ -124,6 +127,132 @@ func (s *Server) addTool(tool mcp.Tool, handler mcpgo.ToolHandlerFunc) {
 		s.metrics.RecordToolCall(toolName, start, err)
 		return result, err
 	}))
+}
+
+func applySubmissionReviewHints(tool *mcp.Tool) {
+	readOnlyTools := map[string]bool{
+		"whatsapp_check_whatsapp":         true,
+		"whatsapp_get_authorization_code": true,
+		"whatsapp_get_chat_history":       true,
+		"whatsapp_get_contact_avatar":     true,
+		"whatsapp_get_contact_info":       true,
+		"whatsapp_get_contacts":           true,
+		"whatsapp_get_group_data":         true,
+		"whatsapp_get_instances":          true,
+		"whatsapp_get_message":            true,
+		"whatsapp_get_qr":                 true,
+		"whatsapp_get_settings":           true,
+		"whatsapp_get_state":              true,
+		"whatsapp_get_wa_settings":        true,
+		"whatsapp_last_incoming_messages": true,
+		"whatsapp_last_outgoing_messages": true,
+		"whatsapp_receive_notification":   true,
+	}
+	localOnlyTools := map[string]bool{
+		"whatsapp_connect":    true,
+		"whatsapp_disconnect": true,
+	}
+	destructiveTools := map[string]bool{
+		"whatsapp_delete_instance":          true,
+		"whatsapp_delete_message":           true,
+		"whatsapp_delete_notification":      true,
+		"whatsapp_edit_message":             true,
+		"whatsapp_forward_messages":         true,
+		"whatsapp_leave_group":              true,
+		"whatsapp_logout":                   true,
+		"whatsapp_remove_group_admin":       true,
+		"whatsapp_remove_group_participant": true,
+		"whatsapp_send_contact":             true,
+		"whatsapp_send_file":                true,
+		"whatsapp_send_file_by_upload":      true,
+		"whatsapp_send_location":            true,
+		"whatsapp_send_message":             true,
+		"whatsapp_send_poll":                true,
+		"whatsapp_set_settings":             true,
+	}
+
+	readOnly := readOnlyTools[tool.Name]
+	openWorld := !readOnly && !localOnlyTools[tool.Name]
+	destructive := destructiveTools[tool.Name]
+
+	tool.Annotations.ReadOnlyHint = &readOnly
+	tool.Annotations.OpenWorldHint = &openWorld
+	tool.Annotations.DestructiveHint = &destructive
+	if readOnly {
+		idempotent := true
+		tool.Annotations.IdempotentHint = &idempotent
+	}
+}
+
+var toolTitles = map[string]string{
+	"whatsapp_connect":                  "Connect Instance",
+	"whatsapp_disconnect":               "Disconnect Instance",
+	"whatsapp_send_message":             "Send Message",
+	"whatsapp_send_file":                "Send File by URL",
+	"whatsapp_upload_file":              "Upload File",
+	"whatsapp_send_file_by_upload":      "Send File",
+	"whatsapp_send_location":            "Send Location",
+	"whatsapp_send_contact":             "Send Contact",
+	"whatsapp_send_poll":                "Send Poll",
+	"whatsapp_forward_messages":         "Forward Messages",
+	"whatsapp_edit_message":             "Edit Message",
+	"whatsapp_delete_message":           "Delete Message",
+	"whatsapp_get_state":                "Get Instance State",
+	"whatsapp_get_settings":             "Get Instance Settings",
+	"whatsapp_set_settings":             "Update Instance Settings",
+	"whatsapp_get_qr":                   "Get QR Code",
+	"whatsapp_check_whatsapp":           "Check WhatsApp Number",
+	"whatsapp_get_contacts":             "Get Contacts",
+	"whatsapp_get_contact_info":         "Get Contact Info",
+	"whatsapp_receive_notification":     "Receive Notification",
+	"whatsapp_create_group":             "Create Group",
+	"whatsapp_get_group_data":           "Get Group Data",
+	"whatsapp_add_group_participant":    "Add Group Participant",
+	"whatsapp_remove_group_participant": "Remove Group Participant",
+	"whatsapp_reboot":                   "Reboot Instance",
+	"whatsapp_logout":                   "Logout Instance",
+	"whatsapp_get_authorization_code":   "Get Authorization Code",
+	"whatsapp_get_wa_settings":          "Get WhatsApp Account Settings",
+	"whatsapp_get_chat_history":         "Get Chat History",
+	"whatsapp_get_message":              "Get Message",
+	"whatsapp_last_incoming_messages":   "Get Recent Incoming Messages",
+	"whatsapp_last_outgoing_messages":   "Get Recent Outgoing Messages",
+	"whatsapp_read_chat":                "Mark Chat as Read",
+	"whatsapp_delete_notification":      "Delete Notification",
+	"whatsapp_set_group_admin":          "Promote Group Admin",
+	"whatsapp_remove_group_admin":       "Demote Group Admin",
+	"whatsapp_leave_group":              "Leave Group",
+	"whatsapp_get_contact_avatar":       "Get Contact Avatar",
+	"whatsapp_create_instance":          "Create Partner Instance",
+	"whatsapp_delete_instance":          "Delete Partner Instance",
+	"whatsapp_get_instances":            "List Partner Instances",
+}
+
+func applyToolTitle(tool *mcp.Tool) {
+	if title, ok := toolTitles[tool.Name]; ok && tool.Annotations.Title == "" {
+		tool.Annotations.Title = title
+	}
+}
+
+func applyWidgetToolMeta(tool *mcp.Tool) {
+	resourceURIByTool := map[string]string{
+		"whatsapp_get_contacts": "ui://contacts",
+		"whatsapp_get_qr":       "ui://qr",
+	}
+	resourceURI, ok := resourceURIByTool[tool.Name]
+	if !ok {
+		return
+	}
+
+	fields := map[string]any{}
+	if tool.Meta != nil {
+		for key, value := range tool.Meta.AdditionalFields {
+			fields[key] = value
+		}
+	}
+	fields["ui"] = map[string]any{"resourceUri": resourceURI}
+	fields["openai/outputTemplate"] = resourceURI
+	tool.Meta = mcp.NewMetaFromMap(fields)
 }
 
 // ServeStdio runs the MCP server over stdio transport (blocking).

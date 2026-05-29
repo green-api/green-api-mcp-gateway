@@ -233,35 +233,70 @@
   function handleNotification(method, params) {
     if (method === 'ui/notifications/tool-input') {
       hostConnected = true;
-      const args = params.arguments ?? {};
-      if (args.instance_id != null) {
-        instanceId = args.instance_id;
-        document.getElementById('instance-badge').textContent = '#' + instanceId;
-      }
+      setInstanceId(extractInstanceId(params));
     }
 
     if (method === 'ui/notifications/tool-result') {
       hostConnected = true;
-      const content = params.content ?? [];
+      handleToolResult(params);
+    }
+  }
 
-      // Try image content first (legacy)
-      const img = content.find(c => c.type === 'image');
-      if (img) { showQR(img.data, img.mimeType); return; }
+  function setInstanceId(value) {
+    if (value == null || value === '') return;
+    instanceId = value;
+    document.getElementById('instance-badge').textContent = '#' + instanceId;
+  }
 
-      // Try JSON text: {"type":"qrCode","message":"<base64>"}
-      const text = content.filter(c => c.type === 'text').map(c => c.text).join('');
-      try {
-        const obj = JSON.parse(text);
-        if (obj.type === 'qrCode' && obj.message) {
-          showQR(obj.message, 'image/png');
-          return;
-        }
-        // alreadyLogged, notAuthorized, etc.
-        if (obj.type === 'alreadyLogged') { showAuthorized(); return; }
-        setError(obj.message || obj.type);
-      } catch {
-        setError(text || 'Unknown error');
+  function extractInstanceId(payload) {
+    return payload?.arguments?.instance_id
+      ?? payload?.input?.instance_id
+      ?? payload?.toolInput?.instance_id
+      ?? payload?.result?._meta?.instance_id
+      ?? payload?._meta?.instance_id
+      ?? null;
+  }
+
+  function unwrapToolResult(payload) {
+    return payload?.result ?? payload?.toolResult ?? payload ?? {};
+  }
+
+  function handleToolResult(payload) {
+    hostConnected = true;
+    const result = unwrapToolResult(payload);
+    setInstanceId(extractInstanceId(payload) ?? extractInstanceId(result));
+
+    const metaQR = result?._meta?.qr ?? payload?._meta?.qr;
+    if (metaQR?.type === 'qrCode' && metaQR.message) {
+      showQR(metaQR.message, metaQR.mimeType || 'image/png');
+      return true;
+    }
+
+    const structured = result.structuredContent ?? payload.structuredContent ?? window.openai?.toolOutput;
+    if (structured?.type === 'qrCode' && structured.message) {
+      showQR(structured.message, structured.mimeType || 'image/png');
+      return true;
+    }
+    if (structured?.type === 'alreadyLogged') { showAuthorized(); return true; }
+
+    const content = result.content ?? payload.content ?? [];
+    const img = content.find?.(c => c.type === 'image');
+    if (img) { showQR(img.data, img.mimeType || 'image/png'); return true; }
+
+    const text = (content.filter?.(c => c.type === 'text') ?? []).map(c => c.text).join('');
+    if (!text) return false;
+    try {
+      const obj = JSON.parse(text);
+      if (obj.type === 'qrCode' && obj.message) {
+        showQR(obj.message, obj.mimeType || 'image/png');
+        return true;
       }
+      if (obj.type === 'alreadyLogged') { showAuthorized(); return true; }
+      setError(obj.message || obj.type);
+      return true;
+    } catch {
+      setError(text || 'Unknown error');
+      return true;
     }
   }
 
@@ -380,20 +415,7 @@
     stopCountdown();
     try {
       const res = await request('tools/call', { name: 'whatsapp_get_qr', arguments: { instance_id: instanceId } });
-      const content = res?.content ?? [];
-
-      // image content
-      const img = content.find(c => c.type === 'image');
-      if (img) { showQR(img.data, img.mimeType); return; }
-
-      // JSON text
-      const text = content.filter(c => c.type === 'text').map(c => c.text).join('');
-      try {
-        const obj = JSON.parse(text);
-        if (obj.type === 'qrCode' && obj.message) { showQR(obj.message, 'image/png'); return; }
-        if (obj.type === 'alreadyLogged') { showAuthorized(); return; }
-        setError(obj.message || obj.type);
-      } catch { setError(text || 'Unknown error'); }
+      if (!handleToolResult(res)) setError('No QR data returned');
     } catch (err) {
       const reason = err?.message || (typeof err === 'string' ? err : null);
       setError(reason);
@@ -402,6 +424,12 @@
 
   // ── Bootstrap ──────────────────────────────────────────────
   setLoading();
+  setInstanceId(window.openai?.toolInput?.instance_id);
+  if (window.openai?.toolResponseMetadata?.qr) {
+    handleToolResult({ _meta: window.openai.toolResponseMetadata, structuredContent: window.openai.toolOutput });
+  } else if (window.openai?.toolOutput) {
+    handleToolResult({ structuredContent: window.openai.toolOutput });
+  }
   request('ui/initialize', {
     protocolVersion: '2026-01-26',
     clientInfo: { name: 'GREEN-API QR', version: '1.0.0' },
