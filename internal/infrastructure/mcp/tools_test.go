@@ -1,6 +1,8 @@
 package mcp
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"testing"
 
 	"github.com/green-api/green-api-mcp-gateway/internal/infrastructure"
@@ -96,14 +98,19 @@ func assertToolResourceURI(t *testing.T, tools map[string]*mcpgo.ServerTool, nam
 func TestWidgetResourceMetaHasSubmissionCSPAndDomain(t *testing.T) {
 	t.Setenv("GREEN_API_WIDGET_DOMAIN", "https://widgets.green-api.example")
 
-	meta := widgetResourceMeta("Contacts widget", []string{"https://pps.whatsapp.net"})
+	meta := widgetResourceMeta("Contacts widget", []string{"https://pps.whatsapp.net"}, "")
 
 	ui, ok := meta["ui"].(map[string]any)
 	if !ok {
 		t.Fatalf("ui metadata missing or wrong type: %#v", meta["ui"])
 	}
-	if got := ui["domain"]; got != "https://widgets.green-api.example" {
-		t.Fatalf("ui.domain = %v, want %q", got, "https://widgets.green-api.example")
+	// ui.domain must be the Claude-format hash of the /mcp endpoint URL:
+	// sha256("<base>/mcp")[:32] + ".claudemcpcontent.com". Claude.ai rejects
+	// raw URLs and silently never renders the iframe when the field is absent.
+	sum := sha256.Sum256([]byte("https://widgets.green-api.example/mcp"))
+	wantDomain := hex.EncodeToString(sum[:])[:32] + ".claudemcpcontent.com"
+	if got := ui["domain"]; got != wantDomain {
+		t.Fatalf("ui.domain = %v, want %q", got, wantDomain)
 	}
 
 	csp, ok := ui["csp"].(map[string]any)
@@ -142,5 +149,15 @@ func assertStringSlice(t *testing.T, got any, want []string) {
 		if slice[i] != want[i] {
 			t.Fatalf("slice[%d] = %q, want %q", i, slice[i], want[i])
 		}
+	}
+}
+
+func TestWidgetResourceMetaClaudeHashDomain(t *testing.T) {
+	t.Setenv("GREEN_API_WIDGET_DOMAIN", "abc123.claudemcpcontent.com")
+
+	meta := widgetResourceMeta("QR widget", nil, "")
+	ui := meta["ui"].(map[string]any)
+	if got := ui["domain"]; got != "abc123.claudemcpcontent.com" {
+		t.Fatalf("ui.domain = %v, want claudemcpcontent hash domain", got)
 	}
 }
