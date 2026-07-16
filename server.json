@@ -26,6 +26,24 @@
           "isSecret": true
         }
       ]
+    },
+    {
+      "type": "sse",
+      "url": "https://mcp.greenapi.com/sse",
+      "headers": [
+        {
+          "name": "X-Instance-Id",
+          "description": "Green API instance ID",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "X-Api-Token",
+          "description": "Green API instance token",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
     }
   ]
 }
