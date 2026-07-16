@@ -16,7 +16,7 @@
     body {
       min-height: 100vh;
       display: flex;
-      align-items: center;
+      align-items: flex-start; /* never clip the top when the iframe is short */
       justify-content: center;
       background: var(--bg);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -51,7 +51,9 @@
     /* ── QR frame ────────────────────────────────────────── */
     .qr-frame {
       position: relative;
-      width: 256px; height: 256px;
+      /* shrink with the iframe so the QR always fits fully on screen */
+      width: clamp(160px, calc(100vh - 200px), 256px);
+      aspect-ratio: 1 / 1;
       align-self: center;
       margin-bottom: 12px;
     }
@@ -345,6 +347,7 @@
     document.getElementById('refresh-btn').disabled = false;
     startCountdown();
     startPoll();
+    reportSize();
   }
 
   function showAuthorized() {
@@ -430,14 +433,37 @@
   } else if (window.openai?.toolOutput) {
     handleToolResult({ structuredContent: window.openai.toolOutput });
   }
+  // ── Size reporting ─────────────────────────────────────────
+  // Ask the host to size the iframe to our content so the QR is never
+  // clipped. Sent on load, after every state change, and on resize.
+  function reportSize() {
+    const h = Math.ceil(document.documentElement.scrollHeight);
+    const w = Math.ceil(document.documentElement.scrollWidth);
+    window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/size-changed', params: { height: h, width: w } }, '*');
+  }
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => reportSize()).observe(document.body);
+  }
+  window.addEventListener('load', reportSize);
+
+  // Claude.ai keeps the iframe reserved-but-hidden until it receives
+  // ui/notifications/initialized; waiting only for the ui/initialize response
+  // can deadlock, so also send it on a short timeout fallback (idempotent).
+  let initializedSent = false;
+  function sendInitialized() {
+    if (initializedSent) return;
+    initializedSent = true;
+    window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} }, '*');
+  }
   request('ui/initialize', {
     protocolVersion: '2026-01-26',
     clientInfo: { name: 'GREEN-API QR', version: '1.0.0' },
     capabilities: {}
   }).then(() => {
     hostConnected = true;
-    window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} }, '*');
+    sendInitialized();
   }).catch(() => { /* connection errors are non-fatal */ });
+  setTimeout(sendInitialized, 1500);
 
   // Timeout: if host never responds, show an error instead of infinite spinner
   setTimeout(() => {

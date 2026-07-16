@@ -13,6 +13,7 @@ import (
 	"image/png"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -626,7 +627,7 @@ func registerTools(s *Server) {
 	// whatsapp_get_qr
 	s.addTool(
 		mcp.NewTool("whatsapp_get_qr",
-			mcp.WithDescription("Get the QR code for instance authorization"),
+			mcp.WithDescription("Get the QR code for instance authorization. The result contains the QR as an image and a qrLink URL to an official GREEN-API page with a full-size auto-refreshing QR code. Always include the qrLink in your response as a clickable markdown link so the user can open it in the browser and scan comfortably."),
 			mcp.WithNumber("instance_id", mcp.Required(), mcp.Description("WhatsApp instance ID")),
 		),
 		mcpgo.ToolHandlerFunc(func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -643,11 +644,25 @@ func registerTools(s *Server) {
 				return mcp.NewToolResultText(string(raw)), nil
 			}
 			if qr.Type == "qrCode" {
-				small, err := resizeQR(qr.Message, 150)
+				small, err := normalizeQR(qr.Message)
 				if err != nil {
-					small = qr.Message // fallback to original
+					small = qr.Message
 				}
-				res := mcp.NewToolResultImage("Scan this QR code to authorize the instance", small, "image/png")
+				text := "Scan this QR code to authorize the instance"
+				// Optional plain-text fallback for hosts that cannot render
+				// image content (enable with GREEN_API_QR_UNICODE=1). Shown
+				// after the image so image-capable hosts display the PNG first.
+				if os.Getenv("GREEN_API_QR_UNICODE") == "1" {
+					if unicode, uerr := pngToUnicode(qr.Message); uerr == nil {
+						text += "\n```\n" + unicode + "\n```"
+					}
+				}
+				res := &mcp.CallToolResult{
+					Content: []mcp.Content{
+						mcp.ImageContent{Type: "image", Data: small, MIMEType: "image/png"},
+						mcp.TextContent{Type: "text", Text: text},
+					},
+				}
 				res.Meta = qrToolResultMeta(small, "image/png")
 				res.StructuredContent = map[string]any{"type": "qrCode", "message": small, "mimeType": "image/png"}
 				return res, nil
@@ -1424,6 +1439,119 @@ func toFloat64(v interface{}) (float64, bool) {
 		return float64(n), true
 	}
 	return 0, false
+}
+
+// pngToUnicode decodes a base64-encoded PNG QR code and returns a Unicode
+// half-block representation using ▀ ▄ █ and space (2 module rows → 1 line).
+// The QR module size is detected from the image so each module maps to
+// exactly one character column — no information is lost to downscaling.
+func pngToUnicode(b64 string) (string, error) {
+	raw, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return "", err
+	}
+	src, err := png.Decode(bytes.NewReader(raw))
+	if err != nil {
+		return "", err
+	}
+	bounds := src.Bounds()
+	w, h := bounds.Dx(), bounds.Dy()
+
+	dark := func(x, y int) bool {
+		r, g, b, _ := src.At(bounds.Min.X+x, bounds.Min.Y+y).RGBA()
+		return (r+g+b)/3 < 0x8000
+	}
+
+	// Detect module size: the shortest run of same-colored pixels across
+	// several scan lines. QR modules are square, so this works per-axis.
+	module := w
+	for _, y := range []int{h / 4, h / 2, 3 * h / 4} {
+		run := 1
+		prev := dark(0, y)
+		for x := 1; x < w; x++ {
+			d := dark(x, y)
+			if d == prev {
+				run++
+				continue
+			}
+			if run < module {
+				module = run
+			}
+			run = 1
+			prev = d
+		}
+	}
+	if module < 1 {
+		module = 1
+	}
+	cols := w / module
+	rows := h / module
+	if cols < 21 { // smallest valid QR is 21 modules
+		return "", fmt.Errorf("could not detect QR modules (got %d columns)", cols)
+	}
+
+	// Sample the center of each module.
+	cell := func(cx, cy int) bool {
+		if cy >= rows {
+			return false
+		}
+		return dark(cx*module+module/2, cy*module+module/2)
+	}
+
+	const margin = 2
+	pad := strings.Repeat(" ", margin)
+	var sb strings.Builder
+	sb.WriteString("\n")
+	for y := 0; y < rows; y += 2 {
+		sb.WriteString(pad)
+		for x := 0; x < cols; x++ {
+			top := cell(x, y)
+			bot := cell(x, y+1)
+			switch {
+			case top && bot:
+				sb.WriteRune('█')
+			case top:
+				sb.WriteRune('▀')
+			case bot:
+				sb.WriteRune('▄')
+			default:
+				sb.WriteRune(' ')
+			}
+		}
+		sb.WriteString(pad)
+		sb.WriteRune('\n')
+	}
+	return sb.String(), nil
+}
+
+// normalizeQR keeps the QR PNG large enough to display and scan comfortably:
+// images wider than 512px are downscaled to 512, images smaller than 300px
+// are upscaled by an integer factor (nearest-neighbor keeps modules sharp).
+func normalizeQR(b64 string) (string, error) {
+	raw, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return "", err
+	}
+	src, err := png.Decode(bytes.NewReader(raw))
+	if err != nil {
+		return "", err
+	}
+	w := src.Bounds().Dx()
+	switch {
+	case w > 512:
+		return resizeQR(b64, 512)
+	case w < 300:
+		factor := (300 + w - 1) / w
+		dst := image.NewRGBA(image.Rect(0, 0, w*factor, src.Bounds().Dy()*factor))
+		draw.NearestNeighbor.Scale(dst, dst.Bounds(), src, src.Bounds(), draw.Over, nil)
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, dst); err != nil {
+			return "", err
+		}
+		return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+	default:
+		return b64, nil
+	}
 }
 
 // resizeQR decodes a base64-encoded PNG, resizes it to maxSide pixels
