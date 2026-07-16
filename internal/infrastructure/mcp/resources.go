@@ -141,9 +141,9 @@ func widgetResourceMeta(description string, resourceDomains []string, requestBas
 		domain = strings.TrimRight(requestBaseURL, "/")
 	}
 	if domain == "" {
-		// Production endpoint (see server.json remotes) — note: green-api.com
+		// Production endpoint (see server.json remotes) — note: greenapi.com
 		// with hyphen, matching the MCP Registry namespace.
-		domain = "https://mcp.green-api.com"
+		domain = "https://mcp.greenapi.com"
 	}
 
 	apiURL := strings.TrimRight(os.Getenv("GREEN_API_URL"), "/")
