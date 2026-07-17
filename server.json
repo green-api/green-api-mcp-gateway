@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "com.green-api/whatsapp",
+  "name": "com.greenapi/whatsapp",
   "title": "Green API WhatsApp",
   "description": "MCP gateway for WhatsApp via Green API: messaging, contacts, groups and instance management.",
   "version": "0.1.2",
