@@ -35,6 +35,9 @@
       display: flex;
       flex-direction: column;
       height: 100%;
+      /* The widget fills the iframe, so scrollHeight alone can't grow it.
+         min-height defines the height we ask the host for via size-changed. */
+      min-height: 480px;
       overflow: hidden;
     }
 
@@ -319,15 +322,35 @@
   let filtered   = [];
   let query       = '';
 
+  // ── Size reporting ─────────────────────────────────────────
+  // Ask the host to size the iframe to our content so the list is not clipped.
+  function reportSize() {
+    // 480 matches #shell min-height — the height we want from the host.
+    const h = Math.max(480, Math.ceil(document.documentElement.scrollHeight));
+    const w = Math.ceil(document.documentElement.scrollWidth);
+    window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/size-changed', params: { height: h, width: w } }, '*');
+  }
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => reportSize()).observe(document.body);
+  }
+  window.addEventListener('load', reportSize);
+
   // ── Bootstrap ──────────────────────────────────────────────
+  // Claude.ai keeps the iframe reserved-but-hidden until it receives
+  // ui/notifications/initialized; waiting only for the ui/initialize response
+  // can deadlock, so also send it on a short timeout fallback (idempotent).
+  let initializedSent = false;
+  function sendInitialized() {
+    if (initializedSent) return;
+    initializedSent = true;
+    window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} }, '*');
+  }
   request('ui/initialize', {
     protocolVersion: '2026-01-26',
     clientInfo: { name: 'GREEN-API Contacts', version: '1.0.0' },
     capabilities: {}
-  }).then(() => {
-    // Signal host that we are ready to receive notifications (MCP Apps spec step 3)
-    window.parent.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} }, '*');
-  }).catch(() => {});
+  }).then(sendInitialized).catch(() => {});
+  setTimeout(sendInitialized, 1500);
 
   // ── Notification handler ───────────────────────────────────
   function handleNotification(method, params) {
@@ -339,7 +362,8 @@
       }
     }
     if (method === 'ui/notifications/tool-result') {
-      const text = (params.content ?? []).find(c => c.type === 'text');
+      const content = params?.result?.content ?? params?.toolResult?.content ?? params.content ?? [];
+      const text = content.find?.(c => c.type === 'text');
       if (text) parseContacts(text.text);
       else      showError();
     }

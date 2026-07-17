@@ -5,6 +5,8 @@ package mcp
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
@@ -26,18 +28,20 @@ import (
 //   - whatsapp://instance/{id}/settings — settings of an instance
 func registerResources(s *Server) {
 	// ui://qr — MCP App widget for instance authorization via QR code
-	qrMeta := widgetResourceMeta("Interactive QR code widget for authorizing a GREEN-API instance", []string{})
 	qrResource := mcp.NewResource("ui://qr", "QR Code Widget",
 		mcp.WithMIMEType("text/html;profile=mcp-app"),
 		mcp.WithResourceDescription("Interactive QR code widget for authorizing a GREEN-API instance"),
 	)
-	qrResource.Meta = mcp.NewMetaFromMap(qrMeta)
+	qrResource.Meta = mcp.NewMetaFromMap(widgetResourceMeta("Interactive QR code widget for authorizing a GREEN-API instance", []string{}, ""))
 	s.mcp.AddResource(
 		qrResource,
-		mcpgo.ResourceHandlerFunc(func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		mcpgo.ResourceHandlerFunc(func(ctx context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+			// _meta.ui.domain must be the hash of the endpoint URL the client
+			// actually connected to, so build it per request.
+			meta := widgetResourceMeta("Interactive QR code widget for authorizing a GREEN-API instance", []string{}, publicBaseURLFromContext(ctx))
 			return []mcp.ResourceContents{
 				mcp.TextResourceContents{
-					Meta:     qrMeta,
+					Meta:     meta,
 					URI:      "ui://qr",
 					MIMEType: "text/html;profile=mcp-app",
 					Text:     infrastructure.QRAppHTML,
@@ -47,18 +51,18 @@ func registerResources(s *Server) {
 	)
 
 	// ui://contacts — MCP App widget for browsing the contacts list
-	contactsMeta := widgetResourceMeta("Interactive contacts list with search and contact details", []string{"https://pps.whatsapp.net"})
 	contactsResource := mcp.NewResource("ui://contacts", "Contacts List Widget",
 		mcp.WithMIMEType("text/html;profile=mcp-app"),
 		mcp.WithResourceDescription("Interactive contacts list with search and contact details"),
 	)
-	contactsResource.Meta = mcp.NewMetaFromMap(contactsMeta)
+	contactsResource.Meta = mcp.NewMetaFromMap(widgetResourceMeta("Interactive contacts list with search and contact details", []string{"https://pps.whatsapp.net"}, ""))
 	s.mcp.AddResource(
 		contactsResource,
-		mcpgo.ResourceHandlerFunc(func(_ context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		mcpgo.ResourceHandlerFunc(func(ctx context.Context, _ mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+			meta := widgetResourceMeta("Interactive contacts list with search and contact details", []string{"https://pps.whatsapp.net"}, publicBaseURLFromContext(ctx))
 			return []mcp.ResourceContents{
 				mcp.TextResourceContents{
-					Meta:     contactsMeta,
+					Meta:     meta,
 					URI:      "ui://contacts",
 					MIMEType: "text/html;profile=mcp-app",
 					Text:     infrastructure.ContactsAppHTML,
@@ -125,13 +129,21 @@ func registerResources(s *Server) {
 	)
 }
 
-func widgetResourceMeta(description string, resourceDomains []string) map[string]any {
+// widgetResourceMeta builds the _meta map for an MCP App widget resource.
+// requestBaseURL is the base URL the client connected to for this request
+// (may be empty for static registration meta); env overrides take precedence.
+func widgetResourceMeta(description string, resourceDomains []string, requestBaseURL string) map[string]any {
 	domain := strings.TrimRight(os.Getenv("GREEN_API_WIDGET_DOMAIN"), "/")
 	if domain == "" {
 		domain = strings.TrimRight(os.Getenv("GREEN_API_BASE_URL"), "/")
 	}
 	if domain == "" {
-		domain = "https://mcp.green-api.com"
+		domain = strings.TrimRight(requestBaseURL, "/")
+	}
+	if domain == "" {
+		// Production endpoint (see server.json remotes) — note: greenapi.com
+		// with hyphen, matching the MCP Registry namespace.
+		domain = "https://mcp.greenapi.com"
 	}
 
 	apiURL := strings.TrimRight(os.Getenv("GREEN_API_URL"), "/")
@@ -148,17 +160,34 @@ func widgetResourceMeta(description string, resourceDomains []string) map[string
 		"resource_domains": resourceDomains,
 	}
 
+	ui := map[string]any{
+		"prefersBorder": true,
+		"csp":           standardCSP,
+		"domain":        claudeWidgetDomain(domain),
+	}
+
 	return map[string]any{
-		"ui": map[string]any{
-			"prefersBorder": true,
-			"csp":           standardCSP,
-			"domain":        domain,
-		},
+		"ui":                         ui,
 		"openai/widgetDescription":   description,
 		"openai/widgetPrefersBorder": true,
 		"openai/widgetCSP":           legacyCSP,
 		"openai/widgetDomain":        domain,
 	}
+}
+
+// claudeWidgetDomain returns the _meta.ui.domain value Claude.ai requires to
+// place the widget iframe: sha256 of the streamable-HTTP endpoint URL
+// (including the /mcp path), first 32 hex chars, under claudemcpcontent.com.
+// Although optional in the MCP Apps spec, Claude silently never renders the
+// iframe without it. A pre-computed value can be forced via
+// GREEN_API_WIDGET_DOMAIN (must already end in .claudemcpcontent.com).
+func claudeWidgetDomain(baseURL string) string {
+	if d := os.Getenv("GREEN_API_WIDGET_DOMAIN"); strings.HasSuffix(d, ".claudemcpcontent.com") {
+		return d
+	}
+	endpoint := strings.TrimRight(baseURL, "/") + "/mcp"
+	sum := sha256.Sum256([]byte(endpoint))
+	return hex.EncodeToString(sum[:])[:32] + ".claudemcpcontent.com"
 }
 
 // extractInstanceID parses the {id} variable from a resource URI template match.

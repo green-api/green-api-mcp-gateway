@@ -283,12 +283,40 @@ func faviconHandler() http.HandlerFunc {
 }
 
 // mcpContextFunc returns a context function that propagates the authenticated
-// instance ID from the HTTP request context into the MCP tool handler context.
+// instance ID and the public base URL of this request from the HTTP request
+// context into the MCP tool/resource handler context.
 func mcpContextFunc(ctx context.Context, r *http.Request) context.Context {
+	ctx = context.WithValue(ctx, publicBaseURLKey{}, requestBaseURL(r))
 	if id, ok := infrastructure.GetInstanceIDFromContext(r.Context()); ok {
 		return context.WithValue(ctx, infrastructure.AuthInstanceIDKey, id)
 	}
 	return ctx
+}
+
+type publicBaseURLKey struct{}
+
+// requestBaseURL reconstructs the externally visible base URL of the request,
+// honoring reverse-proxy headers (ngrok, nginx) over the direct connection.
+func requestBaseURL(r *http.Request) string {
+	scheme := r.Header.Get("X-Forwarded-Proto")
+	if scheme == "" {
+		if r.TLS != nil {
+			scheme = "https"
+		} else {
+			scheme = "http"
+		}
+	}
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Host
+	}
+	return scheme + "://" + host
+}
+
+// publicBaseURLFromContext returns the base URL stored by mcpContextFunc, or "".
+func publicBaseURLFromContext(ctx context.Context) string {
+	s, _ := ctx.Value(publicBaseURLKey{}).(string)
+	return s
 }
 
 // corsMiddleware adds CORS headers so browser-based MCP clients (Inspector, web apps)
@@ -324,7 +352,10 @@ func (s *Server) ServeSSE(ctx context.Context, port int) error {
 	addr := fmt.Sprintf(":%d", port)
 	baseURL := s.baseURL(addr)
 
-	sseSrv := mcpgo.NewSSEServer(s.mcp, mcpgo.WithBaseURL(baseURL))
+	sseSrv := mcpgo.NewSSEServer(s.mcp,
+		mcpgo.WithBaseURL(baseURL),
+		mcpgo.WithSSEContextFunc(mcpContextFunc),
+	)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler())
@@ -439,6 +470,7 @@ func (s *Server) ServeStreamableHTTP(ctx context.Context, port int) error {
 
 	streamSrv := mcpgo.NewStreamableHTTPServer(s.mcp,
 		mcpgo.WithStateLess(false),
+		mcpgo.WithHTTPContextFunc(mcpContextFunc),
 	)
 
 	mux := http.NewServeMux()
